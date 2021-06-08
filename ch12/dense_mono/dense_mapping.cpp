@@ -58,8 +58,8 @@ bool readDatasetFiles(
  * @param ref           参考图像
  * @param curr          当前图像
  * @param T_C_R         参考图像到当前图像的位姿
- * @param depth         深度
- * @param depth_cov     深度方差
+ * @param depth         深度图
+ * @param depth_cov     深度方差图
  * @return              是否成功
  */
 bool update(
@@ -99,8 +99,8 @@ bool epipolarSearch(
  * @param pt_curr   当前图像点
  * @param T_C_R     位姿
  * @param epipolar_direction 极线方向
- * @param depth     深度均值
- * @param depth_cov2    深度方向
+ * @param depth     深度均值图
+ * @param depth_cov2    深度方差图
  * @return          是否成功
  */
 bool updateDepthFilter(
@@ -196,14 +196,14 @@ int main(int argc, char **argv) {
     double init_depth = 3.0;    // 深度初始值
     double init_cov2 = 3.0;     // 方差初始值
     Mat depth(height, width, CV_64F, init_depth);             // 深度图
-    Mat depth_cov2(height, width, CV_64F, init_cov2);         // 深度图方差
+    Mat depth_cov2(height, width, CV_64F, init_cov2);         // 深度方差
 
     for (int index = 1; index < color_image_files.size(); index++) {
         cout << "*** loop " << index << " ***" << endl;
         Mat curr = imread(color_image_files[index], 0);
         if (curr.data == nullptr) continue;
         SE3d pose_curr_TWC = poses_TWC[index];
-        SE3d pose_T_C_R = pose_curr_TWC.inverse() * pose_ref_TWC;   // 坐标转换关系： T_C_W * T_W_R = T_C_R
+        SE3d pose_T_C_R = pose_curr_TWC.inverse() * pose_ref_TWC;   // 坐标转换关系： T_C_W * T_W_R = T_C_R   T_C_R为第一帧到当前帧的位姿变换矩阵
         update(ref, curr, pose_T_C_R, depth, depth_cov2);
         evaludateDepth(ref_depth, depth);
         plotDepth(ref_depth, depth);
@@ -257,7 +257,12 @@ bool readDatasetFiles(
 }
 
 // 对整个深度图进行更新
-bool update(const Mat &ref, const Mat &curr, const SE3d &T_C_R, Mat &depth, Mat &depth_cov2) {
+bool update(const Mat &ref, //参考帧(即第一帧)
+            const Mat &curr, //当前帧
+            const SE3d &T_C_R, //参考帧到当前帧的变换矩阵
+            Mat &depth, //深度图
+            Mat &depth_cov2 //深度方差图
+            ) {
     for (int x = boarder; x < width - boarder; x++)
         for (int y = boarder; y < height - boarder; y++) {
             // 遍历每个像素
@@ -291,16 +296,22 @@ bool update(const Mat &ref, const Mat &curr, const SE3d &T_C_R, Mat &depth, Mat 
 // 极线搜索
 // 方法见书 12.2 12.3 两节
 bool epipolarSearch(
-    const Mat &ref, const Mat &curr,
-    const SE3d &T_C_R, const Vector2d &pt_ref,
-    const double &depth_mu, const double &depth_cov,
-    Vector2d &pt_curr, Vector2d &epipolar_direction) {
-    Vector3d f_ref = px2cam(pt_ref);
-    f_ref.normalize();
-    Vector3d P_ref = f_ref * depth_mu;    // 参考帧的 P 向量
+    const Mat &ref, //参考帧(即第一帧)
+    const Mat &curr, //当前帧
+    const SE3d &T_C_R, //参考帧到当前帧的变换矩阵
+    const Vector2d &pt_ref,  //参考帧的像素坐标（x，y）
+    const double &depth_mu,  //深度值
+    const double &depth_cov,  //当前像素的深度方差
+    Vector2d &pt_curr,  //匹配成功的当前帧像素坐标（只负责传值回去）
+    Vector2d &epipolar_direction  //极线方向
+    ) {
+    Vector3d f_ref = px2cam(pt_ref); //参考帧的像素坐标转化为相机坐标
+    f_ref.normalize(); //向量单位化，生成单位矢量
+    Vector3d P_ref = f_ref * depth_mu;    //单位向量乘该像素的深度即参考帧的 P 向量
 
     Vector2d px_mean_curr = cam2px(T_C_R * P_ref); // 按深度均值投影的像素
     double d_min = depth_mu - 3 * depth_cov, d_max = depth_mu + 3 * depth_cov;
+    //注：以均值位为中心，左右各取3赛格吗作为半径，在当前帧中寻找极线的投影
     if (d_min < 0.1) d_min = 0.1;
     Vector2d px_min_curr = cam2px(T_C_R * (f_ref * d_min));    // 按最小深度投影的像素
     Vector2d px_max_curr = cam2px(T_C_R * (f_ref * d_max));    // 按最大深度投影的像素
@@ -317,9 +328,10 @@ bool epipolarSearch(
     // 在极线上搜索，以深度均值点为中心，左右各取半长度
     double best_ncc = -1.0;
     Vector2d best_px_curr;
+    //遍历此极线上的像素（步长取二分之根号二的近似值0.7），寻找NCC最高的点作为匹配点
     for (double l = -half_length; l <= half_length; l += 0.7) { // l+=sqrt(2)
         Vector2d px_curr = px_mean_curr + l * epipolar_direction;  // 待匹配点
-        if (!inside(px_curr))
+        if (!inside(px_curr))//检测该待匹配点是否在图像边框内
             continue;
         // 计算待匹配点与参考帧的 NCC
         double ncc = NCC(ref, curr, pt_ref, px_curr);
@@ -335,9 +347,13 @@ bool epipolarSearch(
 }
 
 double NCC(
-    const Mat &ref, const Mat &curr,
-    const Vector2d &pt_ref, const Vector2d &pt_curr) {
+    const Mat &ref, //参考帧
+    const Mat &curr, //当前帧
+    const Vector2d &pt_ref, //参考帧的像素坐标
+    const Vector2d &pt_curr //当前帧的待匹配点像素坐标
+    ) {
     // 零均值-归一化互相关
+    // NCC的计算使用了去均值化的做法
     // 先算均值
     double mean_ref = 0, mean_curr = 0;
     vector<double> values_ref, values_curr; // 参考帧和当前帧的均值
@@ -346,13 +362,14 @@ double NCC(
             double value_ref = double(ref.ptr<uchar>(int(y + pt_ref(1, 0)))[int(x + pt_ref(0, 0))]) / 255.0;
             mean_ref += value_ref;
 
-            double value_curr = getBilinearInterpolatedValue(curr, pt_curr + Vector2d(x, y));
+            double value_curr = double(curr.ptr<uchar>(int(y + pt_curr(1, 0)))[int(x + pt_curr(0, 0))]) / 255.0;
+            //double value_curr = getBilinearInterpolatedValue(curr, pt_curr + Vector2d(x, y));//?双线性灰度插值,看不懂...
             mean_curr += value_curr;
 
             values_ref.push_back(value_ref);
             values_curr.push_back(value_curr);
         }
-
+    //累加值除以像素块（窗口）大小得均值
     mean_ref /= ncc_area;
     mean_curr /= ncc_area;
 
@@ -367,29 +384,32 @@ double NCC(
     return numerator / sqrt(demoniator1 * demoniator2 + 1e-10);   // 防止分母出现零
 }
 
+//更新深度滤波器
 bool updateDepthFilter(
-    const Vector2d &pt_ref,
-    const Vector2d &pt_curr,
-    const SE3d &T_C_R,
-    const Vector2d &epipolar_direction,
-    Mat &depth,
-    Mat &depth_cov2) {
+    const Vector2d &pt_ref, //参考帧的像素坐标
+    const Vector2d &pt_curr, //匹配成功的当前帧像素坐标
+    const SE3d &T_C_R, //参考帧到当前帧的变换矩阵
+    const Vector2d &epipolar_direction, //极线方向
+    Mat &depth, //深度图
+    Mat &depth_cov2 //深度方差图
+    ) {
     // 不知道这段还有没有人看
+
     // 用三角化计算深度
     SE3d T_R_C = T_C_R.inverse();
     Vector3d f_ref = px2cam(pt_ref);
     f_ref.normalize();
     Vector3d f_curr = px2cam(pt_curr);
     f_curr.normalize();
-
     // 方程
-    // d_ref * f_ref = d_cur * ( R_RC * f_cur ) + t_RC
-    // f2 = R_RC * f_cur
+    // d_ref * f_ref = d_cur * ( R_RC * f_cur ) + t_RC  // s2.x2=s1.R.x1+t
+    // f2 = R_RC * f_cur //R.x1 = x3
     // 转化成下面这个矩阵方程组
     // => [ f_ref^T f_ref, -f_ref^T f2 ] [d_ref]   [f_ref^T t]
-    //    [ f_cur^T f_ref, -f2^T f2    ] [d_cur] = [f2^T t   ]
-    Vector3d t = T_R_C.translation();
-    Vector3d f2 = T_R_C.so3() * f_curr;
+    //    [ f_2^T f_ref, -f2^T f2    ] [d_cur] = [f2^T t   ]
+    // 二阶方程用克莱默法则求解并解之
+    Vector3d t = T_R_C.translation(); // 当前帧到参考帧的移动向量
+    Vector3d f2 = T_R_C.so3() * f_curr;  // 当前帧的相机坐标转化为参考帧的相机坐标
     Vector2d b = Vector2d(t.dot(f_ref), t.dot(f2));
     Matrix2d A;
     A(0, 0) = f_ref.dot(f_ref);
@@ -401,8 +421,9 @@ bool updateDepthFilter(
     Vector3d xn = t + ans[1] * f2;          // cur 结果
     Vector3d p_esti = (xm + xn) / 2.0;      // P的位置，取两者的平均
     double depth_estimation = p_esti.norm();   // 深度值
+    // 用三角化计算深度(结束)
 
-    // 计算不确定性（以一个像素为误差）
+    // 计算不确定性（以一个像素为误差），即计算估计方差
     Vector3d p = f_ref * depth_estimation;
     Vector3d a = p - t;
     double t_norm = t.norm();
@@ -424,13 +445,14 @@ bool updateDepthFilter(
     double mu_fuse = (d_cov2 * mu + sigma2 * depth_estimation) / (sigma2 + d_cov2);
     double sigma_fuse2 = (sigma2 * d_cov2) / (sigma2 + d_cov2);
 
+    //更新深度图和深度方差图，一次只更新一个像素
     depth.ptr<double>(int(pt_ref(1, 0)))[int(pt_ref(0, 0))] = mu_fuse;
     depth_cov2.ptr<double>(int(pt_ref(1, 0)))[int(pt_ref(0, 0))] = sigma_fuse2;
 
     return true;
 }
 
-// 后面这些太简单我就不注释了（其实是因为懒）
+// 显示图像
 void plotDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     imshow("depth_truth", depth_truth * 0.4);
     imshow("depth_estimate", depth_estimate * 0.4);
@@ -438,6 +460,7 @@ void plotDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     waitKey(1);
 }
 
+//评测深度估计
 void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     double ave_depth_error = 0;     // 平均误差
     double ave_depth_error_sq = 0;      // 平方误差
@@ -455,6 +478,7 @@ void evaludateDepth(const Mat &depth_truth, const Mat &depth_estimate) {
     cout << "Average squared error = " << ave_depth_error_sq << ", average error: " << ave_depth_error << endl;
 }
 
+//显示极线匹配
 void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_curr) {
     Mat ref_show, curr_show;
     cv::cvtColor(ref, ref_show, CV_GRAY2BGR);
@@ -467,7 +491,7 @@ void showEpipolarMatch(const Mat &ref, const Mat &curr, const Vector2d &px_ref, 
     imshow("curr", curr_show);
     waitKey(1);
 }
-
+//显示极线
 void showEpipolarLine(const Mat &ref, const Mat &curr, const Vector2d &px_ref, const Vector2d &px_min_curr,
                       const Vector2d &px_max_curr) {
 

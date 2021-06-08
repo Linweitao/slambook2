@@ -62,9 +62,10 @@ int main(int argc, char **argv) {
 
   // 建立3D点
   Mat d1 = imread(argv[3], CV_LOAD_IMAGE_UNCHANGED);       // 深度图为16位无符号数，单通道图像
-  Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
-  vector<Point3f> pts_3d;
-  vector<Point2f> pts_2d;
+  Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);    //相机内参矩阵
+
+  vector<Point3f> pts_3d;//1图特征点的3D坐标
+  vector<Point2f> pts_2d;//2图对应的特征点的像素坐标
   for (DMatch m:matches) {
     ushort d = d1.ptr<unsigned short>(int(keypoints_1[m.queryIdx].pt.y))[int(keypoints_1[m.queryIdx].pt.x)];
     if (d == 0)   // bad depth
@@ -78,10 +79,13 @@ int main(int argc, char **argv) {
   cout << "3d-2d pairs: " << pts_3d.size() << endl;
 
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+
+  //使用EPnP方法解决（调用OpenCV的solverPnP函数）
   Mat r, t;
   solvePnP(pts_3d, pts_2d, K, Mat(), r, t, false); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
   Mat R;
-  cv::Rodrigues(r, R); // r为旋转向量形式，用Rodrigues公式转换为矩阵
+  cv::Rodrigues(r, R); // r为旋转向量形式，用罗德里格斯公式转换为旋转矩阵
+
   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
   chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve pnp in opencv cost time: " << time_used.count() << " seconds." << endl;
@@ -89,25 +93,32 @@ int main(int argc, char **argv) {
   cout << "R=" << endl << R << endl;
   cout << "t=" << endl << t << endl;
 
+  //把OpenCV的Point3f和Point2f数据转换为Eigen的Vector3d和Vector2d
   VecVector3d pts_3d_eigen;
   VecVector2d pts_2d_eigen;
   for (size_t i = 0; i < pts_3d.size(); ++i) {
     pts_3d_eigen.push_back(Eigen::Vector3d(pts_3d[i].x, pts_3d[i].y, pts_3d[i].z));
     pts_2d_eigen.push_back(Eigen::Vector2d(pts_2d[i].x, pts_2d[i].y));
   }
-
+  //使用高斯牛顿法进行优化
   cout << "calling bundle adjustment by gauss newton" << endl;
   Sophus::SE3d pose_gn;
   t1 = chrono::steady_clock::now();
+
   bundleAdjustmentGaussNewton(pts_3d_eigen, pts_2d_eigen, K, pose_gn);
+
   t2 = chrono::steady_clock::now();
   time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve pnp by gauss newton cost time: " << time_used.count() << " seconds." << endl;
 
+
+  //使用图优化的g2o库进行优化
   cout << "calling bundle adjustment by g2o" << endl;
   Sophus::SE3d pose_g2o;
   t1 = chrono::steady_clock::now();
+
   bundleAdjustmentG2O(pts_3d_eigen, pts_2d_eigen, K, pose_g2o);
+
   t2 = chrono::steady_clock::now();
   time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve pnp by g2o cost time: " << time_used.count() << " seconds." << endl;
@@ -160,12 +171,12 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
     }
   }
 }
-
+// 像素坐标转相机归一化坐标
 Point2d pixel2cam(const Point2d &p, const Mat &K) {
   return Point2d
     (
-      (p.x - K.at<double>(0, 2)) / K.at<double>(0, 0),
-      (p.y - K.at<double>(1, 2)) / K.at<double>(1, 1)
+      (p.x - K.at<double>(0, 2)) / K.at<double>(0, 0),      //X=(u-cx)/fx
+      (p.y - K.at<double>(1, 2)) / K.at<double>(1, 1)       //Y=(u-cy)/fy
     );
 }
 
@@ -173,7 +184,8 @@ void bundleAdjustmentGaussNewton(
   const VecVector3d &points_3d,
   const VecVector2d &points_2d,
   const Mat &K,
-  Sophus::SE3d &pose) {
+  Sophus::SE3d &pose)
+  {
   typedef Eigen::Matrix<double, 6, 1> Vector6d;
   const int iterations = 10;
   double cost = 0, lastCost = 0;

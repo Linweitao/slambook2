@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 
   // 使用对数映射获得它的李代数
   Vector3d so3 = SO3_R.log();
-  cout << "so3 = " << so3.transpose() << endl;
+  cout << "so3 = " << so3.transpose() << endl;//行向量显示
   // hat 为向量到反对称矩阵
   cout << "so3 hat=\n" << Sophus::SO3d::hat(so3) << endl;
   // 相对的，vee为反对称到向量
@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
   Vector6d update_se3; //更新量
   update_se3.setZero();
   update_se3(0, 0) = 1e-4d;
+  cout << "update_se3=" << update_se3.transpose() << endl;
   Sophus::SE3d SE3_updated = Sophus::SE3d::exp(update_se3) * SE3_Rt;
   cout << "SE3 updated = " << endl << SE3_updated.matrix() << endl;
 

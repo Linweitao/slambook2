@@ -7,26 +7,28 @@
 using namespace Sophus;
 using namespace std;
 
-string groundtruth_file = "./example/groundtruth.txt";
-string estimated_file = "./example/estimated.txt";
+string groundtruth_file = "../groundtruth.txt";
+string estimated_file = "../estimated.txt";
 
 typedef vector<Sophus::SE3d, Eigen::aligned_allocator<Sophus::SE3d>> TrajectoryType;
 
-void DrawTrajectory(const TrajectoryType &gt, const TrajectoryType &esti);
+void DrawTrajectory(const TrajectoryType &gt, const TrajectoryType &esti);//声明画图函数,引入两个轨迹
 
-TrajectoryType ReadTrajectory(const string &path);
+TrajectoryType ReadTrajectory(const string &path);//声明读轨迹函数，读入path路径下的txt文件，并返回轨迹
 
 int main(int argc, char **argv) {
   TrajectoryType groundtruth = ReadTrajectory(groundtruth_file);
   TrajectoryType estimated = ReadTrajectory(estimated_file);
+
+  //确保轨迹非空且两个轨迹点数量相等，否则报错并终止程序
   assert(!groundtruth.empty() && !estimated.empty());
   assert(groundtruth.size() == estimated.size());
 
-  // compute rmse
+  // compute rmse计算均方根误差
   double rmse = 0;
   for (size_t i = 0; i < estimated.size(); i++) {
     Sophus::SE3d p1 = estimated[i], p2 = groundtruth[i];
-    double error = (p2.inverse() * p1).log().norm();
+    double error = (p2.inverse() * p1).log().norm();//先取对数后求模
     rmse += error * error;
   }
   rmse = rmse / double(estimated.size());

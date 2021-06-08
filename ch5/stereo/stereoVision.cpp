@@ -9,10 +9,11 @@ using namespace std;
 using namespace Eigen;
 
 // 文件路径
-string left_file = "./left.png";
-string right_file = "./right.png";
+string left_file = "../left.png";
+string right_file = "../right.png";
 
 // 在pangolin中画图，已写好，无需调整
+// 绘制点云图
 void showPointCloud(
     const vector<Vector4d, Eigen::aligned_allocator<Vector4d>> &pointcloud);
 
@@ -26,11 +27,12 @@ int main(int argc, char **argv) {
     // 读取图像
     cv::Mat left = cv::imread(left_file, 0);
     cv::Mat right = cv::imread(right_file, 0);
+    //StereoSGBM用于计算两幅图像间的差异图
     cv::Ptr<cv::StereoSGBM> sgbm = cv::StereoSGBM::create(
         0, 96, 9, 8 * 9 * 9, 32 * 9 * 9, 1, 63, 10, 100, 32);    // 神奇的参数
     cv::Mat disparity_sgbm, disparity;
-    sgbm->compute(left, right, disparity_sgbm);
-    disparity_sgbm.convertTo(disparity, CV_32F, 1.0 / 16.0f);
+    sgbm->compute(left, right, disparity_sgbm);//获得视差映射
+    disparity_sgbm.convertTo(disparity, CV_32F, 1.0 / 16.0f);//缩放并转换到另一种数据类型
 
     // 生成点云
     vector<Vector4d, Eigen::aligned_allocator<Vector4d>> pointcloud;
@@ -45,7 +47,7 @@ int main(int argc, char **argv) {
             // 根据双目模型计算 point 的位置
             double x = (u - cx) / fx;
             double y = (v - cy) / fy;
-            double depth = fx * b / (disparity.at<float>(v, u));
+            double depth = fx * b / (disparity.at<float>(v, u));//即Z
             point[0] = x * depth;
             point[1] = y * depth;
             point[2] = depth;

@@ -3,9 +3,11 @@
 #include <g2o/core/base_vertex.h>
 #include <g2o/core/base_unary_edge.h>
 #include <g2o/core/block_solver.h>
+
 #include <g2o/core/optimization_algorithm_levenberg.h>
 #include <g2o/core/optimization_algorithm_gauss_newton.h>
 #include <g2o/core/optimization_algorithm_dogleg.h>
+
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include <Eigen/Core>
 #include <opencv2/core/core.hpp>
@@ -14,6 +16,7 @@
 
 using namespace std;
 
+// 定义顶点类型
 // 曲线模型的顶点，模板参数：优化变量维度和数据类型
 class CurveFittingVertex : public g2o::BaseVertex<3, Eigen::Vector3d> {
 public:
@@ -35,6 +38,7 @@ public:
   virtual bool write(ostream &out) const {}
 };
 
+// 定义边类型
 // 误差模型 模板参数：观测值维度，类型，连接顶点类型
 class CurveFittingEdge : public g2o::BaseUnaryEdge<1, double, CurveFittingVertex> {
 public:
@@ -71,8 +75,7 @@ int main(int argc, char **argv) {
   double ar = 1.0, br = 2.0, cr = 1.0;         // 真实参数值
   double ae = 2.0, be = -1.0, ce = 5.0;        // 估计参数值
   int N = 100;                                 // 数据点
-  double w_sigma = 1.0;                        // 噪声Sigma值
-  double inv_sigma = 1.0 / w_sigma;
+  double w_sigma = 1.0;                        // 噪声Sigma(方差)值
   cv::RNG rng;                                 // OpenCV随机数产生器
 
   vector<double> x_data, y_data;      // 数据
@@ -85,10 +88,10 @@ int main(int argc, char **argv) {
   // 构建图优化，先设定g2o
   typedef g2o::BlockSolver<g2o::BlockSolverTraits<3, 1>> BlockSolverType;  // 每个误差项优化变量维度为3，误差值维度为1
   typedef g2o::LinearSolverDense<BlockSolverType::PoseMatrixType> LinearSolverType; // 线性求解器类型
-
   // 梯度下降方法，可以从GN, LM, DogLeg 中选
   auto solver = new g2o::OptimizationAlgorithmGaussNewton(
     g2o::make_unique<BlockSolverType>(g2o::make_unique<LinearSolverType>()));
+
   g2o::SparseOptimizer optimizer;     // 图模型
   optimizer.setAlgorithm(solver);   // 设置求解器
   optimizer.setVerbose(true);       // 打开调试输出
@@ -111,12 +114,12 @@ int main(int argc, char **argv) {
 
   // 执行优化
   cout << "start optimization" << endl;
-  chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
+  //chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
   optimizer.initializeOptimization();
   optimizer.optimize(10);
-  chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
-  chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
-  cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
+  //chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
+  //chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
+  //cout << "solve time cost = " << time_used.count() << " seconds. " << endl;
 
   // 输出优化值
   Eigen::Vector3d abc_estimate = v->estimate();

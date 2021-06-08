@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
 
     // 求解线性方程 Hx=b
     Vector3d dx = H.ldlt().solve(b);
+    //判断是非数(NaN)值
     if (isnan(dx[0])) {
       cout << "result is nan!" << endl;
       break;
@@ -58,7 +59,7 @@ int main(int argc, char **argv) {
       cout << "cost: " << cost << ">= last cost: " << lastCost << ", break." << endl;
       break;
     }
-
+    //更新估计参数值
     ae += dx[0];
     be += dx[1];
     ce += dx[2];

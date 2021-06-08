@@ -16,7 +16,7 @@ using namespace std;
 int main( int argc, char** argv ) {
     // read the image 
     cout<<"reading images... "<<endl;
-    vector<Mat> images; 
+    vector<Mat> images;
     for ( int i=0; i<10; i++ )
     {
         string path = "./data/"+to_string(i+1)+".png";
@@ -28,12 +28,12 @@ int main( int argc, char** argv ) {
     vector<Mat> descriptors;
     for ( Mat& image:images )
     {
-        vector<KeyPoint> keypoints; 
+        vector<KeyPoint> keypoints;
         Mat descriptor;
         detector->detectAndCompute( image, Mat(), keypoints, descriptor );
         descriptors.push_back( descriptor );
     }
-    
+
     // create vocabulary 
     cout<<"creating vocabulary ... "<<endl;
     DBoW3::Vocabulary vocab;
@@ -41,6 +41,6 @@ int main( int argc, char** argv ) {
     cout<<"vocabulary info: "<<vocab<<endl;
     vocab.save( "vocabulary.yml.gz" );
     cout<<"done"<<endl;
-    
+
     return 0;
 }

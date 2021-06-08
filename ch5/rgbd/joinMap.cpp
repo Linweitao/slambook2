@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     vector<cv::Mat> colorImgs, depthImgs;    // 彩色图和深度图
     TrajectoryType poses;         // 相机位姿
 
-    ifstream fin("./pose.txt");
+    ifstream fin("./pose.txt");//pose.txt存储了5张图像的相机外参位姿
     if (!fin) {
         cerr << "请在有pose.txt的目录下运行此程序" << endl;
         return 1;
@@ -25,12 +25,15 @@ int main(int argc, char **argv) {
 
     for (int i = 0; i < 5; i++) {
         boost::format fmt("./%s/%d.%s"); //图像文件格式
+        //读取RGB图
         colorImgs.push_back(cv::imread((fmt % "color" % (i + 1) % "png").str()));
+        //读取depth图
         depthImgs.push_back(cv::imread((fmt % "depth" % (i + 1) % "pgm").str(), -1)); // 使用-1读取原始图像
 
         double data[7] = {0};
         for (auto &d:data)
             fin >> d;
+        //这些外参以Twc形式
         Sophus::SE3d pose(Eigen::Quaterniond(data[6], data[3], data[4], data[5]),
                           Eigen::Vector3d(data[0], data[1], data[2]));
         poses.push_back(pose);
@@ -56,10 +59,10 @@ int main(int argc, char **argv) {
                 unsigned int d = depth.ptr<unsigned short>(v)[u]; // 深度值
                 if (d == 0) continue; // 为0表示没有测量到
                 Eigen::Vector3d point;
-                point[2] = double(d) / depthScale;
-                point[0] = (u - cx) * point[2] / fx;
-                point[1] = (v - cy) * point[2] / fy;
-                Eigen::Vector3d pointWorld = T * point;
+                point[2] = double(d) / depthScale;//Z
+                point[0] = (u - cx) * point[2] / fx;//X
+                point[1] = (v - cy) * point[2] / fy;//Y
+                Eigen::Vector3d pointWorld = T * point;//将相机坐标中的图像坐标点转换为世界坐标点
 
                 Vector6d p;
                 p.head<3>() = pointWorld;

@@ -22,6 +22,8 @@ int main(int argc, char **argv) {
   cv::imshow("image", image);      // 用cv::imshow显示图像
   cv::waitKey(0);                  // 暂停程序,等待一个按键输入
 
+  cout << "图像type " << image.type() <<endl;
+  cout << "CV_8UC1 " << CV_8UC1 <<endl;
   // 判断image的类型
   if (image.type() != CV_8UC1 && image.type() != CV_8UC3) {
     // 图像类型不符合要求
@@ -65,5 +67,6 @@ int main(int argc, char **argv) {
 
   // 对于图像还有很多基本的操作,如剪切,旋转,缩放等,限于篇幅就不一一介绍了,请参看OpenCV官方文档查询每个函数的调用方法.
   cv::destroyAllWindows();
+
   return 0;
 }

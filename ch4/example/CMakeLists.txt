@@ -1,4 +1,6 @@
 find_package(Pangolin REQUIRED)
 include_directories(${Pangolin_INCLUDE_DIRS})
+include_directories("/home/tony/workspace/slambook2/3rdparty/Sophus")
+include_directories("/usr/include/eigen3")
 add_executable(trajectoryError trajectoryError.cpp)
 target_link_libraries(trajectoryError ${Pangolin_LIBRARIES})
