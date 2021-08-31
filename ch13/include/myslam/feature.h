@@ -24,6 +24,11 @@ struct Feature {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     typedef std::shared_ptr<Feature> Ptr;
 
+    /*
+     * Frame持有了Feature的shared_ptr，
+     * 那么应避免Feature再持有Frame的shared_ptr，
+     * 否则两者相互引用，将导致智能指针无法自动析构
+     */
     std::weak_ptr<Frame> frame_;         // 持有该feature的frame
     cv::KeyPoint position_;              // 2D提取位置
     std::weak_ptr<MapPoint> map_point_;  // 关联地图点
@@ -34,6 +39,7 @@ struct Feature {
    public:
     Feature() {}
 
+    //构造函数，使用帧和2D位置初始化
     Feature(std::shared_ptr<Frame> frame, const cv::KeyPoint &kp)
         : frame_(frame), position_(kp) {}
 };

@@ -18,6 +18,7 @@ namespace myslam {
 Frontend::Frontend() {
     gftt_ =
         cv::GFTTDetector::create(Config::Get<int>("num_features"), 0.01, 20);
+    /// maxCorners最大角点数目   qualityLevel角点可以接受的最小特征值，一般0.1或者0.01,不超过1   minDistance角点之间的最小距离
     num_features_init_ = Config::Get<int>("num_features_init");
     num_features_ = Config::Get<int>("num_features");
 }
@@ -27,7 +28,7 @@ bool Frontend::AddFrame(myslam::Frame::Ptr frame) {
 
     switch (status_) {
         case FrontendStatus::INITING:
-            StereoInit();
+            StereoInit(); //双目初始化
             break;
         case FrontendStatus::TRACKING_GOOD:
         case FrontendStatus::TRACKING_BAD:

@@ -16,6 +16,7 @@ class Map {
    public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
     typedef std::shared_ptr<Map> Ptr;
+    //unordered_map是一个键值对容器，内部实现了哈希表
     typedef std::unordered_map<unsigned long, MapPoint::Ptr> LandmarksType;
     typedef std::unordered_map<unsigned long, Frame::Ptr> KeyframesType;
 
@@ -57,12 +58,12 @@ class Map {
     void RemoveOldKeyframe();
 
     std::mutex data_mutex_;
-    LandmarksType landmarks_;         // all landmarks
-    LandmarksType active_landmarks_;  // active landmarks
-    KeyframesType keyframes_;         // all key-frames
-    KeyframesType active_keyframes_;  // all key-frames
+    LandmarksType landmarks_;         // all landmarks所有的路标点
+    LandmarksType active_landmarks_;  // active landmarks被激活的路标点
+    KeyframesType keyframes_;         // all key-frames所有的关键帧
+    KeyframesType active_keyframes_;  // active key-frames被激活的关键帧
 
-    Frame::Ptr current_frame_ = nullptr;
+    Frame::Ptr current_frame_ = nullptr; //当前帧初始化为空指针
 
     // settings
     int num_active_keyframes_ = 7;  // 激活的关键帧数量

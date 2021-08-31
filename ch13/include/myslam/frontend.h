@@ -12,7 +12,7 @@ namespace myslam {
 
 class Backend;
 class Viewer;
-
+/// 前端追踪的四种状态1、初始化 2、追踪正常 3、追踪不良（追踪点较少） 4、丢失
 enum class FrontendStatus { INITING, TRACKING_GOOD, TRACKING_BAD, LOST };
 
 /**
@@ -27,17 +27,22 @@ class Frontend {
     Frontend();
 
     /// 外部接口，添加一个帧并计算其定位结果
+    /// 即前端处理流程
     bool AddFrame(Frame::Ptr frame);
 
-    /// Set函数
+    /// 设置地图
     void SetMap(Map::Ptr map) { map_ = map; }
 
+    /// 设置后端
     void SetBackend(std::shared_ptr<Backend> backend) { backend_ = backend; }
 
+    /// 设置可视化
     void SetViewer(std::shared_ptr<Viewer> viewer) { viewer_ = viewer; }
 
+    /// 获取前段跟踪状态
     FrontendStatus GetStatus() const { return status_; }
 
+    /// 设置左右相机对象
     void SetCameras(Camera::Ptr left, Camera::Ptr right) {
         camera_left_ = left;
         camera_right_ = right;
@@ -46,18 +51,21 @@ class Frontend {
    private:
     /**
      * Track in normal mode
+     * 正常追踪模式
      * @return true if success
      */
     bool Track();
 
     /**
      * Reset when lost
+     * 当追踪丢失时进行重置
      * @return true if success
      */
     bool Reset();
 
     /**
      * Track with last frame
+     *
      * @return num of tracked points
      */
     int TrackLastFrame();
@@ -107,6 +115,7 @@ class Frontend {
 
     /**
      * Set the features in keyframe as new observation of the map points
+     * 建立图像帧上的特征点与地图点的观察关系
      */
     void SetObservationsForKeyFrame();
 

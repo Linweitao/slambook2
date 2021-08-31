@@ -36,8 +36,8 @@ void MapPoint::RemoveObservation(std::shared_ptr<Feature> feat) {
     for (auto iter = observations_.begin(); iter != observations_.end();
          iter++) {
         if (iter->lock() == feat) {
-            observations_.erase(iter);
-            feat->map_point_.reset();
+            observations_.erase(iter);//删除
+            feat->map_point_.reset(); //将该特征点的关联地图点置为空
             observed_times_--;
             break;
         }

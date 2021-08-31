@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.19)
 project(myslam)
 
 set(CMAKE_BUILD_TYPE Release)
@@ -56,8 +56,8 @@ set(THIRD_PARTY_LIBS
         ${GFLAGS_LIBRARIES}
         pthread
         ${CSPARSE_LIBRARY}
+        Sophus::Sophus
         )
-
 enable_testing()
 
 ############### source and test ######################

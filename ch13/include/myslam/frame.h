@@ -29,7 +29,7 @@ struct Frame {
     std::mutex pose_mutex_;          // Pose数据锁
     cv::Mat left_img_, right_img_;   // stereo images
 
-    // extracted features in left image
+    // extracted features in left imaged
     std::vector<std::shared_ptr<Feature>> features_left_;
     // corresponding features in right image, set to nullptr if no corresponding
     std::vector<std::shared_ptr<Feature>> features_right_;
@@ -41,6 +41,7 @@ struct Frame {
           const Mat &right);
 
     // set and get pose, thread safe
+    // 获取位姿并设置线程锁
     SE3 Pose() {
         std::unique_lock<std::mutex> lck(pose_mutex_);
         return pose_;
